@@ -76,46 +76,117 @@ class GameState:
         self.moving_from     = None    # sel asli (kolom, baris)
 
         # ── Tempatkan penghalang acak & hitung jalur awal ────────────────
+        self.entry = ENTRY
+        self.exit = EXIT
         self._place_random_obstacles()
 
     # ──────────────────────────────────────────────────────────
     #  Penghalang terrain acak
     # ──────────────────────────────────────────────────────────
-    def _place_random_obstacles(self, count: int = 18):
+    def _place_random_obstacles(self, wall_count: int = 6, single_count: int = 10):
         """
-        Tempatkan penghalang terrain acak di awal permainan sehingga
-        jalur musuh tidak selalu lurus dari kiri ke kanan.
+        Tempatkan penghalang terrain acak berupa tembok (1D lurus) dan beberapa tile tunggal
+        di awal permainan. Tembok lebih sering muncul di tengah jalur A*
+        agar musuh terpaksa mengambil rute berkelok.
         Setiap sel dicek dulu dengan A* agar path tetap valid.
         """
-        ec, er = ENTRY
-        xc, xr = EXIT
+        ec, er = self.entry
+        xc, xr = self.exit
 
         # Lindungi area di sekitar pintu masuk dan keluar
-        protected = {ENTRY, EXIT}
+        protected = {self.entry, self.exit}
         for dc in range(1, 4):
             protected.add((ec + dc, er))
             protected.add((xc - dc, xr))
 
-        placed   = 0
-        attempts = 0
-        while placed < count and attempts < 600:
+        # Arah pertumbuhan tembok: horizontal, vertikal
+        DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+        # --- 1. Tempatkan tembok 1D ---
+        walls_placed = 0
+        attempts     = 0
+        max_attempts = 800
+
+        while walls_placed < wall_count and attempts < max_attempts:
             attempts += 1
-            # Sedikit bias ke baris tengah agar jalur terpaksa naik/turun
+
+            # Ukuran tembok acak: 2-4 tile per tembok
+            wall_size = random.randint(2, 4)
+
+            # ── Pilih seed cell, bias ke tengah jalur A* ────────────
+            cur_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
+            if cur_path and random.random() < 0.70:
+                # 70% chance: pilih titik di sekitar tengah jalur
+                mid_start = len(cur_path) // 4
+                mid_end   = 3 * len(cur_path) // 4
+                anchor    = random.choice(cur_path[mid_start:mid_end])
+                # Offset sedikit agar tidak tepat di jalur (1-2 sel)
+                offset_r  = random.choice([-2, -1, 1, 2])
+                offset_c  = random.choice([-1, 0, 1])
+                col = max(1, min(COLS - 2, anchor[0] + offset_c))
+                row = max(1, min(ROWS - 2, anchor[1] + offset_r))
+            else:
+                # 30% chance: posisi acak biasa
+                col = random.randint(1, COLS - 2)
+                row = random.randint(1, ROWS - 2)
+
+            seed = (col, row)
+            if seed in protected or seed in self.blocked:
+                continue
+
+            # ── Tumbuhkan tembok 1D dari seed ──────────────────────────
+            wall_cells = [seed]
+            grow_dir   = random.choice(DIRECTIONS)
+
+            for i in range(1, wall_size):
+                prev = wall_cells[-1]
+                nc   = prev[0] + grow_dir[0]
+                nr   = prev[1] + grow_dir[1]
+                next_cell = (nc, nr)
+
+                # Cek batas grid
+                if not (1 <= nc < COLS - 1 and 1 <= nr < ROWS - 1):
+                    break
+                if next_cell in protected or next_cell in self.blocked:
+                    break
+
+                wall_cells.append(next_cell)
+
+            # Minimal 2 tile untuk membentuk tembok
+            if len(wall_cells) < 2:
+                continue
+
+            # ── Validasi seluruh tembok sekaligus dengan A* ────────
+            test_blocked = self.blocked | set(wall_cells)
+            if astar(test_blocked, self.entry, self.exit, COLS, ROWS) is not None:
+                for cell in wall_cells:
+                    self.blocked.add(cell)
+                    self.obstacles.add(cell)
+                walls_placed += 1
+
+        # --- 2. Tempatkan single tiles ---
+        singles_placed = 0
+        attempts = 0
+        while singles_placed < single_count and attempts < 600:
+            attempts += 1
+            # Sedikit bias ke baris tengah
             col = random.randint(1, COLS - 2)
             if random.random() < 0.55:
                 row = random.randint(max(0, er - 5), min(ROWS - 1, er + 5))
             else:
                 row = random.randint(1, ROWS - 2)
+            
             cell = (col, row)
             if cell in protected or cell in self.blocked:
                 continue
+            
             test_blocked = self.blocked | {cell}
-            if astar(test_blocked, ENTRY, EXIT, COLS, ROWS) is not None:
+            if astar(test_blocked, self.entry, self.exit, COLS, ROWS) is not None:
                 self.blocked.add(cell)
                 self.obstacles.add(cell)
-                placed += 1
+                singles_placed += 1
 
-        self.current_path = astar(self.blocked, ENTRY, EXIT, COLS, ROWS)
+        self.current_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
 
     # ──────────────────────────────────────────────────────────
     #  Fungsi bantuan publik
@@ -147,18 +218,22 @@ class GameState:
         Menara dapat ditempatkan di (kolom, baris) jika dan hanya jika:
           1. Sel berada di dalam grid.
           2. Sel belum diblokir.
-          3. Memblokir sel masih menyisakan jalur A* yang valid.
+          3. Sel bukan tempat masuk (entry) atau keluar (exit).
+          4. Memblokir sel masih menyisakan jalur A* yang valid.
 
-        Kondisi 3 adalah pemeriksaan AI yang kritis — ini mencegah
+        Kondisi 4 adalah pemeriksaan AI yang kritis — ini mencegah
         pemain agar tidak sepenuhnya mengelilingi musuh tanpa jalan keluar.
         """
         if not (0 <= col < COLS and 0 <= row < ROWS):
             return False
         if (col, row) in self.blocked:
             return False
+        if (col, row) == self.entry or (col, row) == self.exit:
+            return False
+            
         # Blokir sementara dan periksa jalur
         test_blocked = self.blocked | {(col, row)}
-        return astar(test_blocked, ENTRY, EXIT, COLS, ROWS) is not None
+        return astar(test_blocked, self.entry, self.exit, COLS, ROWS) is not None
 
     def try_place_tower(self, col: int, row: int) -> bool:
         """Mencoba untuk menempatkan menara yang dipilih; mengembalikan True jika berhasil."""
@@ -175,7 +250,7 @@ class GameState:
 
         # ── Konfirmasi penempatan ───────────────────────────────────
         self.blocked.add((col, row))
-        new_path = astar(self.blocked, ENTRY, EXIT, COLS, ROWS)
+        new_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
         self.current_path = new_path
 
         tower = Tower(col, row, self.selected_type)
@@ -234,7 +309,7 @@ class GameState:
         self.blocked.discard((col, row))
 
         # Hitung ulang jalur dengan sel yang sekarang bebas
-        self.current_path = astar(self.blocked, ENTRY, EXIT, COLS, ROWS)
+        self.current_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
         for e in self.enemies:
             if e.alive and not e.reached_exit:
                 e.update_path(self.current_path)
@@ -253,11 +328,11 @@ class GameState:
             return False
         if (col, row) in self.blocked:
             return False
-        # Sel ENTRY dan EXIT harus tetap dapat dilewati
-        if (col, row) == ENTRY or (col, row) == EXIT:
+        # Sel self.entry dan self.exit harus tetap dapat dilewati
+        if (col, row) == self.entry or (col, row) == self.exit:
             return False
         test_blocked = self.blocked | {(col, row)}
-        return astar(test_blocked, ENTRY, EXIT, COLS, ROWS) is not None
+        return astar(test_blocked, self.entry, self.exit, COLS, ROWS) is not None
 
     def drop_tower(self, col: int, row: int) -> bool:
         """
@@ -284,7 +359,7 @@ class GameState:
         tower.target  = None
 
         self.blocked.add((col, row))
-        self.current_path = astar(self.blocked, ENTRY, EXIT, COLS, ROWS)
+        self.current_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
         for e in self.enemies:
             if e.alive and not e.reached_exit:
                 e.update_path(self.current_path)
@@ -314,7 +389,7 @@ class GameState:
         tower.target  = None
 
         self.blocked.add((col, row))
-        self.current_path = astar(self.blocked, ENTRY, EXIT, COLS, ROWS)
+        self.current_path = astar(self.blocked, self.entry, self.exit, COLS, ROWS)
         for e in self.enemies:
             if e.alive and not e.reached_exit:
                 e.update_path(self.current_path)
@@ -330,6 +405,27 @@ class GameState:
     def start_next_wave(self):
         if self.wave_number >= len(WAVES):
             return  # semua gelombang selesai
+        
+        # ── Randomize Entry and Exit for the new wave ──
+        valid_found = False
+        for _ in range(100):
+            # random y pos, fixed x pos
+            new_entry = (0, random.randint(1, ROWS - 2))
+            new_exit  = (COLS - 1, random.randint(1, ROWS - 2))
+            
+            # Ensure it's not already blocked by a tower or obstacle
+            if new_entry in self.blocked or new_exit in self.blocked:
+                continue
+            
+            # Ensure there is a valid path
+            new_path = astar(self.blocked, new_entry, new_exit, COLS, ROWS)
+            if new_path is not None:
+                self.entry = new_entry
+                self.exit  = new_exit
+                self.current_path = new_path
+                valid_found = True
+                break
+        
         wave_data            = WAVES[self.wave_number]
         self.wave_queue      = [list(g) for g in wave_data]
         self.active_group    = None

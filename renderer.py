@@ -74,14 +74,14 @@ def draw_grid(surface: pygame.Surface, gs):
                          (rx + CELL_SIZE - m, ry + m), (rx + m, ry + CELL_SIZE - m), 2)
 
     # Portal masuk
-    ec, er = ENTRY
+    ec, er = gs.entry
     pygame.draw.rect(surface, C_ENTRY,
                      (ec * CELL_SIZE, er * CELL_SIZE, CELL_SIZE, CELL_SIZE))
     _txt(surface, '▶', 'small', (10, 10, 10),
          ec * CELL_SIZE + 12, er * CELL_SIZE + 12)
 
     # Portal keluar
-    xc, xr = EXIT
+    xc, xr = gs.exit
     pygame.draw.rect(surface, C_EXIT,
                      (xc * CELL_SIZE, xr * CELL_SIZE, CELL_SIZE, CELL_SIZE))
     _txt(surface, '✕', 'small', (10, 10, 10),

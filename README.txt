@@ -159,9 +159,11 @@
       FPS = 60             Target frame per detik.
 
     Titik Akhir Peta
-      ENTRY = (0, 7)       Kemunculan musuh: tepi kiri, baris 7.
-      EXIT  = (19, 7)      Tujuan musuh : tepi kanan, baris 7.
-      Kedua sel ini selalu dijaga agar dapat dilewati oleh A*.
+      ENTRY = (0, 7)       Kemunculan awal musuh (default): tepi kiri.
+      EXIT  = (19, 7)      Tujuan awal musuh (default): tepi kanan.
+      (Catatan: Posisi y dari titik masuk dan keluar sekarang diacak secara dinamis
+      di setiap awal gelombang oleh game_state.py. Keduanya selalu dicek untuk 
+      memastikan tidak menimpa menara dan pemain tidak bisa membangun menara di sel ini.)
 
     Tipe Menara (dictionary TOWER_TYPES)
       Mendefinisikan 4 menara: basic, sniper, rapid, bomb.
@@ -416,7 +418,9 @@
       blocked                           Himpunan sel (kolom, baris)
                                         yang ditempati menara.
       current_path                      Jalur A* terbaru dari
-                                        ENTRY ke EXIT.
+                                        self.entry ke self.exit.
+      entry, exit                       Posisi portal yang secara dinamis berubah 
+                                        setiap gelombang dimulai.
       towers / enemies                  List entitas.
       wave_active, wave_queue           Status kemunculan gelombang.
       selected_type                     Menara yang sedang dipilih.
@@ -458,8 +462,14 @@
       Ini berarti musuh baru selalu mulai dengan jalur 
       optimal saat ini yang sudah memperhitungkan semua menara yang ditempatkan.
 
-    Manajemen Gelombang:
-      start_next_wave()  — memuat data gelombang dari config.WAVES.
+    Manajemen Gelombang & Penghalang:
+      _place_random_obstacles() — Mengacak rintangan terrain. Menggunakan tembok 1D 
+                                  dan blok tunggal yang dibiaskan untuk muncul di 
+                                  tengah jalur A* untuk memaksa rute yang berkelok.
+      start_next_wave()  — Mengacak posisi sumbu-y untuk self.entry dan self.exit 
+                           di setiap awal gelombang. Divalidasi dengan A* untuk 
+                           memastikan tidak menabrak menara dan rute tetap tersedia. 
+                           Memuat data musuh dari config.WAVES.
       _update_spawning() — menghitung timer kemunculan, membuat musuh.
       Gelombang dimulai otomatis setelah detik WAVE_BREAK dari waktu persiapan.
 
