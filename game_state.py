@@ -16,7 +16,7 @@
 import random
 
 from config import (
-    COLS, ROWS, ENTRY, EXIT, GOLD_START, LIVES_START,
+    COLS, ROWS, GOLD_START, LIVES_START,
     TOWER_TYPES, WAVES, WAVE_BREAK, CELL_SIZE,
 )
 from astar      import astar
@@ -76,8 +76,8 @@ class GameState:
         self.moving_from     = None    # sel asli (kolom, baris)
 
         # ── Tempatkan penghalang acak & hitung jalur awal ────────────────
-        self.entry = ENTRY
-        self.exit = EXIT
+        self.entry = (0, random.randint(1, ROWS - 2))
+        self.exit  = (COLS - 1, random.randint(1, ROWS - 2))
         self._place_random_obstacles()
 
     # ──────────────────────────────────────────────────────────
@@ -405,27 +405,7 @@ class GameState:
     def start_next_wave(self):
         if self.wave_number >= len(WAVES):
             return  # semua gelombang selesai
-        
-        # ── Randomize Entry and Exit for the new wave ──
-        valid_found = False
-        for _ in range(100):
-            # random y pos, fixed x pos
-            new_entry = (0, random.randint(1, ROWS - 2))
-            new_exit  = (COLS - 1, random.randint(1, ROWS - 2))
-            
-            # Ensure it's not already blocked by a tower or obstacle
-            if new_entry in self.blocked or new_exit in self.blocked:
-                continue
-            
-            # Ensure there is a valid path
-            new_path = astar(self.blocked, new_entry, new_exit, COLS, ROWS)
-            if new_path is not None:
-                self.entry = new_entry
-                self.exit  = new_exit
-                self.current_path = new_path
-                valid_found = True
-                break
-        
+
         wave_data            = WAVES[self.wave_number]
         self.wave_queue      = [list(g) for g in wave_data]
         self.active_group    = None

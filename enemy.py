@@ -53,18 +53,15 @@ class Enemy:
     def update_path(self, new_path: list):
         """
         Dipanggil saat menara ditempatkan dan A* mengembalikan rute baru.
-        Mencari titik jalan terdekat di new_path ke sel grid musuh
-        saat ini dan melanjutkannya dari sana.
+        Langsung snap posisi musuh ke titik terdekat di new_path.
         """
         if new_path is None:
-            return  # tidak seharusnya terjadi (penempatan divalidasi terlebih dahulu)
+            return
 
-        # Sel grid terdekat ke posisi piksel saat ini
         cur_col = int(self.x // CELL_SIZE)
         cur_row = int(self.y // CELL_SIZE)
 
-        # Temukan titik gabung: titik jalan paling awal di new_path di pada atau di depan kita
-        best_idx  = 1
+        best_idx  = 0
         best_dist = float('inf')
         for i, (c, r) in enumerate(new_path):
             d = abs(c - cur_col) + abs(r - cur_row)
@@ -72,8 +69,13 @@ class Enemy:
                 best_dist = d
                 best_idx  = i
 
+        # Langsung pindah ke titik terdekat di jalur baru
+        snap_col, snap_row = new_path[best_idx]
+        self.x = snap_col * CELL_SIZE + CELL_SIZE / 2
+        self.y = snap_row * CELL_SIZE + CELL_SIZE / 2
+
         self.path         = new_path
-        self.waypoint_idx = max(best_idx, 1)
+        self.waypoint_idx = best_idx + 1
 
     # ----------------------------------------------------------
     def take_damage(self, amount: float):

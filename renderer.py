@@ -8,7 +8,7 @@ import pygame
 import math
 from config import (
     CELL_SIZE, COLS, ROWS, SIDEBAR_W, SCREEN_W, SCREEN_H,
-    ENTRY, EXIT, TOWER_TYPES, TOWER_ORDER, WAVES, WAVE_BREAK,
+    TOWER_TYPES, TOWER_ORDER, WAVES, WAVE_BREAK,
     C_BG, C_GRID, C_GRID_LINE, C_PATH, C_ENTRY, C_EXIT,
     C_SIDEBAR, C_SIDEBAR_HDR, C_TEXT, C_TEXT_DIM,
     C_GOLD, C_LIVES, C_WAVE, C_BTN, C_BTN_SEL, C_BTN_HOV,
@@ -43,10 +43,10 @@ def _txt(surface, text, font_key, color, x, y, center=False):
 # ═══════════════════════════════════════════════════════════════
 #  GRID
 # ═══════════════════════════════════════════════════════════════
-def draw_grid(surface: pygame.Surface, gs):
+def draw_grid(surface: pygame.Surface, gs, show_path: bool = True):
     """Gambar sel latar belakang, sorotan jalur, penanda masuk/keluar."""
 
-    path_set = set(gs.current_path) if gs.current_path else set()
+    path_set = set(gs.current_path) if (gs.current_path and show_path) else set()
 
     for row in range(ROWS):
         for col in range(COLS):
@@ -362,7 +362,7 @@ def draw_overlay(surface: pygame.Surface, gs):
 # ═══════════════════════════════════════════════════════════════
 def draw_all(surface: pygame.Surface, gs, show_path: bool = True):
     surface.fill(C_BG)
-    draw_grid(surface, gs)
+    draw_grid(surface, gs, show_path)
     draw_hover(surface, gs)
     draw_towers(surface, gs)
     draw_enemies(surface, gs)

@@ -15,15 +15,16 @@ class Projectile:
     """
 
     def __init__(self, x: float, y: float, target,
-                 damage: float, speed: float, color: tuple):
-        self.x      = x
-        self.y      = y
-        self.target = target      # Referensi musuh
-        self.damage = damage
-        self.speed  = speed
-        self.color  = color
-        self.done   = False
-        self.size   = 4
+                 damage: float, speed: float, color: tuple, tower_ref):
+        self.x         = x
+        self.y         = y
+        self.target    = target      # Referensi musuh
+        self.damage    = damage
+        self.speed     = speed
+        self.color     = color
+        self.done      = False
+        self.size      = 4
+        self.tower_ref = tower_ref   # Referensi menara penembak
 
     def update(self):
         # Target sudah hilang
@@ -36,7 +37,10 @@ class Projectile:
         dist = math.hypot(dx, dy)
 
         if dist <= self.speed:
+            was_alive = self.target.alive
             self.target.take_damage(self.damage)
+            if was_alive and not self.target.alive:
+                self.tower_ref.kills += 1
             self.done = True
         else:
             self.x += (dx / dist) * self.speed
@@ -154,6 +158,7 @@ class Tower:
             self.damage,
             self.proj_speed,
             self.proj_color,
+            tower_ref=self,
         )
         self.projectiles.append(proj)
 
