@@ -18,7 +18,7 @@ ENTRY = (0, 7)              # tempat muncul musuh (tepi kiri, baris tengah)
 EXIT  = (COLS - 1, 7)       # tujuan musuh (tepi kanan)
 
 # ── Sumber daya awal ───────────────────────────────────────
-GOLD_START  = 500
+GOLD_START  = 50000
 LIVES_START = 20
 
 # ── Palet Warna (tema taktis-gelap) ─────────────────────

@@ -406,13 +406,34 @@ class GameState:
         if self.wave_number >= len(WAVES):
             return  # semua gelombang selesai
 
+        # Wave pertama pakai entry/exit awal; wave berikutnya diacak
+        if self.wave_number > 0:
+            for _ in range(200):
+                new_entry = (0, random.randint(1, ROWS - 2))
+                new_exit  = (COLS - 1, random.randint(1, ROWS - 2))
+                if new_entry in self.blocked or new_exit in self.blocked:
+                    continue
+                new_path = astar(self.blocked, new_entry, new_exit, COLS, ROWS)
+                if new_path is not None:
+                    self.entry        = new_entry
+                    self.exit         = new_exit
+                    self.current_path = new_path
+                    for e in self.enemies:
+                        if e.alive and not e.reached_exit:
+                            e.update_path(new_path)
+                    break
+            # Jika 200 percobaan gagal (tower terlalu padat), entry/exit tetap
+
         wave_data            = WAVES[self.wave_number]
         self.wave_queue      = [list(g) for g in wave_data]
         self.active_group    = None
         self.spawn_timer     = 0.0
         self.wave_active     = True
         self.wave_number    += 1
-        self.notify(f"⚠  Wave {self.wave_number} incoming!")
+        msg = (f"⚠  Wave {self.wave_number} incoming!"
+               if self.wave_number == 1
+               else f"⚠  Wave {self.wave_number} — rute baru!")
+        self.notify(msg)
 
     def _update_spawning(self, dt: float):
         self.spawn_timer -= dt
